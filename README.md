@@ -165,3 +165,44 @@ for instance report perf data from the processus 5
 ./profiling/script/run.sh HOTSPOT 5 #for a gui representation
 
 ```
+
+
+
+
+
+# Optimisation d'un solveur Lattice Boltzmann 2D (MPI/OpenMP)
+
+Projet TOP (M1 CHPS, UVSQ – Université Paris-Saclay), réalisé en binôme. Optimisation d'un solveur Lattice Boltzmann (maillage 800×160, 1000 itérations) en C++ avec MPI et OpenMP.
+
+## Méthode
+
+Profilage avec `perf stat` (cycles, défauts de cache L1, dTLB, branch-misses) et MAQAO `lprof`, une optimisation à la fois, métrique de référence : MLUPS (Mega Lattice Updates Per Second).
+
+## Optimisations
+
+1. Suppression d'un verrou de synchronisation artificiel (1 s par itération).
+2. Passage de AoS à SoA pour la propagation (38 % du temps CPU, ~11 défauts de cache L1 par cellule).
+3. Extraction de l'invariant de boucle u² dans la collision.
+4. Suppression des barrières MPI globales (échange de halos point à point).
+5. Étude MPI pur vs OpenMP pur (politique First Touch, topologie CCD), contrôle de l'oversubscription, ordonnancement OpenMP static.
+
+## Résultats (8 cœurs, AMD Ryzen 7 7735HS)
+
+| Configuration | MPI | OMP | MLUPS |
+|---|---|---|---|
+| Baseline (avec verrou) | 1 | 1 | 0,13 |
+| Baseline réelle | 1 | 1 | 6,92 |
+| Oversubscription | 8 | libre | 7,33 |
+| OpenMP pur | 1 | 8 | 17,71 |
+| MPI pur (dynamic) | 8 | 1 | 121,01 |
+| MPI pur (static) | 8 | 1 | 124,87 |
+
+Gain réel sur le temps de calcul : **×18** (6,92 → 124,87 MLUPS).
+
+## Limites
+
+Les implémentations n'ont pas passé les tests de validation par checksum. Pistes restantes : communications non bloquantes (`MPI_Isend`/`MPI_Irecv`) et topologie cartésienne (`MPI_Cart_create`).
+
+## Rapport
+
+Voir `rapport.pdf`.
